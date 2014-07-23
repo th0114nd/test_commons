@@ -1,0 +1,10 @@
+{application, test_commons, [
+    {description, "Common testing functionality."},
+    {vsn, "0.1.0"},
+    {modules, []},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib
+    ]}
+]}.
