@@ -1,5 +1,5 @@
 %% @doc
-%%   A tc_proper_model is a behaviour which describes a scenario and a set of events,
+%%   A tcb_model is a behaviour which describes a scenario and a set of events,
 %%   deduces the expected results and then observes and compares the actual results when
 %%   the events are fed to the scenario. The scenario is expected to be a description
 %%   of a running erlang configuration (e.g., a supervisor hierarchy with children),
@@ -12,7 +12,7 @@
 %%   generated scenarios or by hand-editing specific scenarios that reproduce an
 %%   actual bug observed in production afflicting the software being tested.
 %% @end
--module(tc_proper_model).
+-module(tcb_model).
 
 %% External API: Certifying code against a set of proper model instances.
 -export([
@@ -27,25 +27,25 @@
          passed_test_case/2
         ]).
 
--include("tc_proper_model.hrl").
+-include("tcb_model.hrl").
 
-%% Behaviour callbacks for generating a tc_proper_model and expected outcomes
--callback get_all_test_model_ids() -> [{Model_Id :: tc_proper_model_id(), Source :: tc_proper_model_source()}].
--callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> Scenario :: tc_proper_scenario().
--callback deduce_proper_expected_status(Scenario_Instance :: tc_proper_scenario()) -> Expected_Status :: term().
+%% Behaviour callbacks for generating a tcb_model and expected outcomes
+-callback get_all_test_model_ids() -> [{Model_Id :: tcb_model_id(), Source :: tcb_model_source()}].
+-callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> Scenario :: tcb_scenario().
+-callback deduce_expected_status(Scenario_Instance :: tcb_scenario()) -> Expected_Status :: term().
 
 %% Behaviour callbacks used per scenario when validating against the model
--callback vivify_proper_scenario           (Scenario :: tc_proper_scenario()) -> tc_proper_scenario_live_ref().
--callback translate_proper_scenario_dsl    (tc_proper_scenario_dsl_desc())    -> tc_proper_scenario_live_desc().
--callback translate_proper_scenario_events (tc_proper_scenario_dsl_events())  -> tc_proper_scenario_live_events().
+-callback vivify_scenario           (Scenario :: tcb_scenario()) -> tcb_scenario_live_ref().
+-callback translate_scenario_dsl    (tcb_scenario_dsl_desc())    -> tcb_scenario_live_desc().
+-callback translate_scenario_events (tcb_scenario_dsl_events())  -> tcb_scenario_live_events().
 
--callback generate_proper_observation(Live_Model_Ref     :: tc_proper_scenario_live_ref(),
-                                      Test_Case_Instance :: tc_proper_test_case())
+-callback generate_observation(Live_Model_Ref     :: tcb_scenario_live_ref(),
+                                      Test_Case_Instance :: tcb_test_case())
               -> Observed_Status :: term().
 
--callback passed_proper_test_case(Case_Number     :: pos_integer(),
-                                  Expected_Status :: tc_proper_scenario_dsl_status(),
-                                  Observed_Status :: tc_proper_scenario_live_status())
+-callback passed_test_case(Case_Number     :: pos_integer(),
+                                  Expected_Status :: tcb_scenario_dsl_status(),
+                                  Observed_Status :: tcb_scenario_live_status())
               -> boolean().
 
 
@@ -54,21 +54,21 @@
 %%-------------------------------------------------------------------
 
 %% Cb_Module is the callback module provided by the model instance.
--spec test_all_models(module()) -> [{tc_proper_model_id(), tc_proper_model_result()}].
+-spec test_all_models(module()) -> [{tcb_model_id(), tcb_model_result()}].
 test_all_models(Cb_Module) ->
     [begin
-         Test_Model = generate_proper_model(Cb_Module, Model_Id, Source),
+         Test_Model = generate_model(Cb_Module, Model_Id, Source),
          {Model_Id, verify_all_scenarios(Test_Model)}
      end || {Model_Id, Source} <- Cb_Module:get_all_test_model_ids()].
 
--spec generate_proper_model(module(), tc_proper_model_id(), tc_proper_model_source()) -> tc_proper_model().
-generate_proper_model(Cb_Module, Model_Id, {file, Full_Name} = Source) ->
+-spec generate_model(module(), tcb_model_id(), tcb_model_source()) -> tcb_model().
+generate_model(Cb_Module, Model_Id, {file, Full_Name} = Source) ->
     {ok, Raw_Scenarios} = file:consult(Full_Name),
     transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios);
-generate_proper_model(Cb_Module, Model_Id, {mfa, {Mfa_Module, Function, Args}} = Source) ->
+generate_model(Cb_Module, Model_Id, {mfa, {Mfa_Module, Function, Args}} = Source) ->
     {ok, Raw_Scenarios} = apply(Mfa_Module, Function, [Cb_Module, Model_Id | Args]),
     transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios);
-generate_proper_model(Cb_Module, Model_Id, {function, Function} = Source)
+generate_model(Cb_Module, Model_Id, {function, Function} = Source)
   when is_function(Function, 1) ->
     {ok, Raw_Scenarios} = Function(Model_Id),
     transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios).
@@ -78,7 +78,7 @@ transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios) ->
                                          {Scenario_Num+1,
                                           [call_transform(Cb_Module, Scenario_Num, Raw_Scenario) | Scenarios]}
                                  end, {1, []}, Raw_Scenarios),
-    #tc_proper_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(Scenarios)}.
+    #tcb_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(Scenarios)}.
 
 call_transform(Cb_Module, Scenario_Num, Raw_Scenario) ->
     try Cb_Module:transform_raw_scenario(Scenario_Num, Raw_Scenario)
@@ -90,15 +90,15 @@ call_transform(Cb_Module, Scenario_Num, Raw_Scenario) ->
     end.
     
 
--spec verify_all_scenarios(Test_Model :: tc_proper_model()) -> tc_proper_model_result().
+-spec verify_all_scenarios(Test_Model :: tcb_model()) -> tcb_model_result().
 %% @doc
 %%   Given a model and corresponding scenarios, generate observed test cases and
 %%   validate that they all pass.
 %% @end
-verify_all_scenarios(#tc_proper_model{scenarios=[]}) -> {true, []};
-verify_all_scenarios(#tc_proper_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
+verify_all_scenarios(#tcb_model{scenarios=[]}) -> {true, []};
+verify_all_scenarios(#tcb_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
     {Success, Success_Case_Count, Failed_Cases}
-        = lists:foldl(fun(#tc_proper_scenario{instance=Case_Number} = Scenario_Instance,
+        = lists:foldl(fun(#tcb_scenario{instance=Case_Number} = Scenario_Instance,
                           {Boolean_Result, Success_Case_Count, Failures}) when Case_Number > 0 ->
                         try
                             Test_Case     = generate_test_case     (Cb_Module, Scenario_Instance),
@@ -121,46 +121,46 @@ verify_all_scenarios(#tc_proper_model{behaviour=Cb_Module, scenarios=Scenarios})
 %% Internal API steps used to validate a single scenario.
 %%-------------------------------------------------------------------
 
--spec generate_test_case(module(), tc_proper_scenario()) -> tc_proper_test_case().
+-spec generate_test_case(module(), tcb_scenario()) -> tcb_test_case().
 %% @doc
 %%   Given a test case scenario to be set up, and a series of events, create a full
 %%   test case by letting the behaviour module deduce the resulting status after
 %%   executing the scenario. The passed in test_case should have all fields specified
-%%   and not just a default initialization of the tc_proper_scenario() type.
+%%   and not just a default initialization of the tcb_scenario() type.
 %% @end
-generate_test_case(Cb_Module, #tc_proper_scenario{instance=Case_Number} = Scenario_Instance)
+generate_test_case(Cb_Module, #tcb_scenario{instance=Case_Number} = Scenario_Instance)
   when is_integer(Case_Number), Case_Number > 0 ->
     Expected_Status = Cb_Module:deduce_proper_expected_status(Scenario_Instance),
-    #tc_proper_test_case{scenario=Scenario_Instance, expected_status=Expected_Status}.
+    #tcb_test_case{scenario=Scenario_Instance, expected_status=Expected_Status}.
 
--spec generate_observed_case(module(), Unexecuted_Test_Case :: tc_proper_test_case()) -> Result :: tc_proper_test_case().
+-spec generate_observed_case(module(), Unexecuted_Test_Case :: tcb_test_case()) -> Result :: tcb_test_case().
 %% @doc
 %%   Given a test case that has not been executed yet, set up the scenario, stream
 %%   the events to the scenario and then retrieve the observed status. This function
 %%   returns an instance of an observed test case that can be validated later.
 %% @end
 generate_observed_case(Cb_Module,
-                       #tc_proper_test_case{scenario=#tc_proper_scenario{instance=Case_Number} = Scenario_Dsl,
+                       #tcb_test_case{scenario=#tcb_scenario{instance=Case_Number} = Scenario_Dsl,
                                             observed_status=?TC_MISSING_TEST_CASE_ELEMENT} = Unexecuted_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
     Live_Model_Ref = Cb_Module:vivify_proper_scenario(Scenario_Dsl),
     Observation    = Cb_Module:generate_proper_observation(Live_Model_Ref, Unexecuted_Test_Case),
-    Unexecuted_Test_Case#tc_proper_test_case{observed_status=Observation}.
+    Unexecuted_Test_Case#tcb_test_case{observed_status=Observation}.
 
--spec passed_test_case(module(), Observed_Test_Case :: tc_proper_test_case())
+-spec passed_test_case(module(), Observed_Test_Case :: tcb_test_case())
       -> {ok, boolean()}
-             | {error, {expected_status_not_generated, tc_proper_test_case()}}
-             | {error, {observed_status_not_generated, tc_proper_test_case()}}.
+             | {error, {expected_status_not_generated, tcb_test_case()}}
+             | {error, {observed_status_not_generated, tcb_test_case()}}.
 %% @doc
 %%   Given a test case that has already been executed and contains an observed
 %%   result status, use the behaviour module to verify if the expected status
 %%   matches the observed status.
 %% @end
-passed_test_case(_Cb_Module, #tc_proper_test_case{expected_status=?TC_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
+passed_test_case(_Cb_Module, #tcb_test_case{expected_status=?TC_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
     {error, {expected_status_not_generated, Observed_Test_Case}};
-passed_test_case(_Cb_Module, #tc_proper_test_case{observed_status=?TC_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
+passed_test_case(_Cb_Module, #tcb_test_case{observed_status=?TC_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
     {error, {observed_status_not_generated, Observed_Test_Case}};
-passed_test_case( Cb_Module, #tc_proper_test_case{scenario=#tc_proper_scenario{instance=Case_Number}} = Observed_Test_Case)
+passed_test_case( Cb_Module, #tcb_test_case{scenario=#tcb_scenario{instance=Case_Number}} = Observed_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
-    #tc_proper_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
-    {ok, Cb_Module:passed_proper_test_case(Case_Number, Expected, Observed)}.
+    #tcb_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
+    {ok, Cb_Module:passed_test_case(Case_Number, Expected, Observed)}.
