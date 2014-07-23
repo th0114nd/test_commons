@@ -130,7 +130,7 @@ verify_all_scenarios(#tcb_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
 %% @end
 generate_test_case(Cb_Module, #tcb_scenario{instance=Case_Number} = Scenario_Instance)
   when is_integer(Case_Number), Case_Number > 0 ->
-    Expected_Status = Cb_Module:deduce_proper_expected_status(Scenario_Instance),
+    Expected_Status = Cb_Module:deduce_expected_status(Scenario_Instance),
     #tcb_test_case{scenario=Scenario_Instance, expected_status=Expected_Status}.
 
 -spec generate_observed_case(module(), Unexecuted_Test_Case :: tcb_test_case()) -> Result :: tcb_test_case().
@@ -143,8 +143,8 @@ generate_observed_case(Cb_Module,
                        #tcb_test_case{scenario=#tcb_scenario{instance=Case_Number} = Scenario_Dsl,
                                             observed_status=?TC_MISSING_TEST_CASE_ELEMENT} = Unexecuted_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
-    Live_Model_Ref = Cb_Module:vivify_proper_scenario(Scenario_Dsl),
-    Observation    = Cb_Module:generate_proper_observation(Live_Model_Ref, Unexecuted_Test_Case),
+    Live_Model_Ref = Cb_Module:vivify_scenario(Scenario_Dsl),
+    Observation    = Cb_Module:generate_observation(Live_Model_Ref, Unexecuted_Test_Case),
     Unexecuted_Test_Case#tcb_test_case{observed_status=Observation}.
 
 -spec passed_test_case(module(), Observed_Test_Case :: tcb_test_case())
