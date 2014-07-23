@@ -27,7 +27,7 @@
          passed_test_case/2
         ]).
 
--include_lib("tcb_model.hrl").
+-include("tcb.hrl").
 
 %% Behaviour callbacks for generating a tcb_model and expected outcomes
 -callback get_all_test_model_ids() -> [{Model_Id :: tcb_model_id(), Source :: tcb_model_source()}].
