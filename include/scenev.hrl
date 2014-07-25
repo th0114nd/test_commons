@@ -1,4 +1,4 @@
-%%  Proper testing occurs via automated scripting of randomly generated
+%%  Proper testing occurs via automated scripting of randomly generated
 %%  scenarios. Each application provides its own customized randomization,
 %%  application behavior, set of event types, and a predictive engine which
 %%  generates the expected solution for a given scenario. A test suite is

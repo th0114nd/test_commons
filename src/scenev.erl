@@ -35,17 +35,17 @@
 -callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> Expected_Status :: term().
 
 %% Behaviour callbacks used per scenario when validating against the model
--callback vivify_scenario           (Scenario :: scenev_scenario()) -> scenev_scenario_live_ref().
--callback translate_scenario_dsl    (scenev_scenario_dsl_desc())    -> scenev_scenario_live_desc().
--callback translate_scenario_events (scenev_scenario_dsl_events())  -> scenev_scenario_live_events().
+-callback vivify_scenario  (scenev_scenario())    -> scenev_live_ref().
+-callback translate_dsl    (scenev_dsl_desc())    -> scenev_live_desc().
+-callback translate_events (scenev_dsl_events())  -> scenev_live_events().
 
--callback generate_observation(Live_Model_Ref     :: scenev_scenario_live_ref(),
-                                      Test_Case_Instance :: scenev_test_case())
+-callback generate_observation(Live_Model_Ref     :: scenev_live_ref(),
+                               Test_Case_Instance :: scenev_test_case())
               -> Observed_Status :: term().
 
 -callback passed_test_case(Case_Number     :: pos_integer(),
-                                  Expected_Status :: scenev_scenario_dsl_status(),
-                                  Observed_Status :: scenev_scenario_live_status())
+                           Expected_Status :: scenev_dsl_status(),
+                           Observed_Status :: scenev_live_status())
               -> boolean().
 
 
@@ -128,8 +128,8 @@ verify_all_scenarios(#scenev_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
 %%   executing the scenario. The passed in test_case should have all fields specified
 %%   and not just a default initialization of the scenev_scenario() type.
 %% @end
-generate_test_case(Cb_Module, #scenev_scenario{} = Scenario_Instance)
-  when is_integer(Case_Number), Case_Number > 0 ->
+generate_test_case(Cb_Module, #scenev_scenario{instance = Case_Number} = Scenario_Instance)
+  when is_integer(Case_Number), Case_Number >= 0 ->
     Expected_Status = callback(Cb_Module, deduce_expected, [Scenario_Instance]),
     #scenev_test_case{scenario=Scenario_Instance, expected_status=Expected_Status}.
 
@@ -143,7 +143,7 @@ generate_observed_case(Cb_Module,
                        #scenev_test_case{scenario=#scenev_scenario{instance=Case_Number} = Scenario_Dsl,
                                             observed_status=?SCENEV_MISSING_TEST_CASE_ELEMENT} = Unexecuted_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
-    Live_Model_Ref = callback(Cb_Module, vivify_scenario, [Scenario_Dsl]}),
+    Live_Model_Ref = callback(Cb_Module, vivify_scenario, [Scenario_Dsl]),
     Observation    = callback(Cb_Module, generate_observation, [Live_Model_Ref, Unexecuted_Test_Case]),
     Unexecuted_Test_Case#scenev_test_case{observed_status=Observation}.
 
@@ -164,7 +164,7 @@ passed_test_case(_Cb_Module, #scenev_test_case{observed_status=?SCENEV_MISSING_T
 passed_test_case( Cb_Module, #scenev_test_case{scenario=#scenev_scenario{instance=Case_Number}} = Observed_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
     #scenev_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
-    {ok, callback(Cb_Module, passed_test_case, [Case_Number, Expected, Observed])}
+    {ok, callback(Cb_Module, passed_test_case, [Case_Number, Expected, Observed])}.
 
 %% @private
 %% @doc
@@ -176,5 +176,6 @@ callback(Mod, Fun, Args)
     try apply(Mod, Fun, Args)
     catch Error:Type -> 
         error_logger:error_msg("Caught ~p error in ~p:~p/~p~n~p",
-                [{Error, Type}, Cb_Module, Fun, length(Args), erlang:get_stacktrace()]),
+                [{Error, Type}, Mod, Fun, length(Args), erlang:get_stacktrace()])
+    end.
         
