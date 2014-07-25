@@ -1,5 +1,5 @@
 %% @doc
-%%   A tcb_model is a behaviour which describes a scenario and a set of events,
+%%   A scenev_model is a behaviour which describes a scenario and a set of events,
 %%   deduces the expected results and then observes and compares the actual results when
 %%   the events are fed to the scenario. The scenario is expected to be a description
 %%   of a running erlang configuration (e.g., a supervisor hierarchy with children),
@@ -12,7 +12,7 @@
 %%   generated scenarios or by hand-editing specific scenarios that reproduce an
 %%   actual bug observed in production afflicting the software being tested.
 %% @end
--module(tcb_model).
+-module(scenev).
 
 %% External API: Certifying code against a set of proper model instances.
 -export([
@@ -27,25 +27,25 @@
          passed_test_case/2
         ]).
 
--include("tcb.hrl").
+-include("scenev.hrl").
 
-%% Behaviour callbacks for generating a tcb_model and expected outcomes
--callback get_all_test_model_ids() -> [{Model_Id :: tcb_model_id(), Source :: tcb_model_source()}].
--callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> Scenario :: tcb_scenario().
--callback deduce_expected_status(Scenario_Instance :: tcb_scenario()) -> Expected_Status :: term().
+%% Behaviour callbacks for generating a scenev_model and expected outcomes
+-callback get_all_test_model_ids() -> [{Model_Id :: scenev_model_id(), Source :: scenev_model_source()}].
+-callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> Scenario :: scenev_scenario().
+-callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> Expected_Status :: term().
 
 %% Behaviour callbacks used per scenario when validating against the model
--callback vivify_scenario           (Scenario :: tcb_scenario()) -> tcb_scenario_live_ref().
--callback translate_scenario_dsl    (tcb_scenario_dsl_desc())    -> tcb_scenario_live_desc().
--callback translate_scenario_events (tcb_scenario_dsl_events())  -> tcb_scenario_live_events().
+-callback vivify_scenario           (Scenario :: scenev_scenario()) -> scenev_scenario_live_ref().
+-callback translate_scenario_dsl    (scenev_scenario_dsl_desc())    -> scenev_scenario_live_desc().
+-callback translate_scenario_events (scenev_scenario_dsl_events())  -> scenev_scenario_live_events().
 
--callback generate_observation(Live_Model_Ref     :: tcb_scenario_live_ref(),
-                                      Test_Case_Instance :: tcb_test_case())
+-callback generate_observation(Live_Model_Ref     :: scenev_scenario_live_ref(),
+                                      Test_Case_Instance :: scenev_test_case())
               -> Observed_Status :: term().
 
 -callback passed_test_case(Case_Number     :: pos_integer(),
-                                  Expected_Status :: tcb_scenario_dsl_status(),
-                                  Observed_Status :: tcb_scenario_live_status())
+                                  Expected_Status :: scenev_scenario_dsl_status(),
+                                  Observed_Status :: scenev_scenario_live_status())
               -> boolean().
 
 
@@ -54,14 +54,14 @@
 %%-------------------------------------------------------------------
 
 %% Cb_Module is the callback module provided by the model instance.
--spec test_all_models(module()) -> [{tcb_model_id(), tcb_model_result()}].
+-spec test_all_models(module()) -> [{scenev_model_id(), scenev_model_result()}].
 test_all_models(Cb_Module) ->
     [begin
          Test_Model = generate_model(Cb_Module, Model_Id, Source),
          {Model_Id, verify_all_scenarios(Test_Model)}
      end || {Model_Id, Source} <- Cb_Module:get_all_test_model_ids()].
 
--spec generate_model(module(), tcb_model_id(), tcb_model_source()) -> tcb_model().
+-spec generate_model(module(), scenev_model_id(), scenev_model_source()) -> scenev_model().
 generate_model(Cb_Module, Model_Id, {file, Full_Name} = Source) ->
     {ok, Raw_Scenarios} = file:consult(Full_Name),
     transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios);
@@ -78,7 +78,7 @@ transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios) ->
                                          {Scenario_Num+1,
                                           [call_transform(Cb_Module, Scenario_Num, Raw_Scenario) | Scenarios]}
                                  end, {1, []}, Raw_Scenarios),
-    #tcb_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(Scenarios)}.
+    #scenev_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(Scenarios)}.
 
 call_transform(Cb_Module, Scenario_Num, Raw_Scenario) ->
     try Cb_Module:transform_raw_scenario(Scenario_Num, Raw_Scenario)
@@ -90,15 +90,15 @@ call_transform(Cb_Module, Scenario_Num, Raw_Scenario) ->
     end.
     
 
--spec verify_all_scenarios(Test_Model :: tcb_model()) -> tcb_model_result().
+-spec verify_all_scenarios(Test_Model :: scenev_model()) -> scenev_model_result().
 %% @doc
 %%   Given a model and corresponding scenarios, generate observed test cases and
 %%   validate that they all pass.
 %% @end
-verify_all_scenarios(#tcb_model{scenarios=[]}) -> {true, []};
-verify_all_scenarios(#tcb_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
+verify_all_scenarios(#scenev_model{scenarios=[]}) -> {true, []};
+verify_all_scenarios(#scenev_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
     {Success, Success_Case_Count, Failed_Cases}
-        = lists:foldl(fun(#tcb_scenario{instance=Case_Number} = Scenario_Instance,
+        = lists:foldl(fun(#scenev_scenario{instance=Case_Number} = Scenario_Instance,
                           {Boolean_Result, Success_Case_Count, Failures}) when Case_Number > 0 ->
                         try
                             Test_Case     = generate_test_case     (Cb_Module, Scenario_Instance),
@@ -121,46 +121,60 @@ verify_all_scenarios(#tcb_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
 %% Internal API steps used to validate a single scenario.
 %%-------------------------------------------------------------------
 
--spec generate_test_case(module(), tcb_scenario()) -> tcb_test_case().
+-spec generate_test_case(module(), scenev_scenario()) -> scenev_test_case().
 %% @doc
 %%   Given a test case scenario to be set up, and a series of events, create a full
 %%   test case by letting the behaviour module deduce the resulting status after
 %%   executing the scenario. The passed in test_case should have all fields specified
-%%   and not just a default initialization of the tcb_scenario() type.
+%%   and not just a default initialization of the scenev_scenario() type.
 %% @end
-generate_test_case(Cb_Module, #tcb_scenario{instance=Case_Number} = Scenario_Instance)
+generate_test_case(Cb_Module, #scenev_scenario{} = Scenario_Instance)
   when is_integer(Case_Number), Case_Number > 0 ->
-    Expected_Status = Cb_Module:deduce_expected_status(Scenario_Instance),
-    #tcb_test_case{scenario=Scenario_Instance, expected_status=Expected_Status}.
+    Expected_Status = callback(Cb_Module, deduce_expected, [Scenario_Instance]),
+    #scenev_test_case{scenario=Scenario_Instance, expected_status=Expected_Status}.
 
--spec generate_observed_case(module(), Unexecuted_Test_Case :: tcb_test_case()) -> Result :: tcb_test_case().
+-spec generate_observed_case(module(), Unexecuted_Test_Case :: scenev_test_case()) -> Result :: scenev_test_case().
 %% @doc
 %%   Given a test case that has not been executed yet, set up the scenario, stream
 %%   the events to the scenario and then retrieve the observed status. This function
 %%   returns an instance of an observed test case that can be validated later.
 %% @end
 generate_observed_case(Cb_Module,
-                       #tcb_test_case{scenario=#tcb_scenario{instance=Case_Number} = Scenario_Dsl,
-                                            observed_status=?TC_MISSING_TEST_CASE_ELEMENT} = Unexecuted_Test_Case)
+                       #scenev_test_case{scenario=#scenev_scenario{instance=Case_Number} = Scenario_Dsl,
+                                            observed_status=?SCENEV_MISSING_TEST_CASE_ELEMENT} = Unexecuted_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
-    Live_Model_Ref = Cb_Module:vivify_scenario(Scenario_Dsl),
-    Observation    = Cb_Module:generate_observation(Live_Model_Ref, Unexecuted_Test_Case),
-    Unexecuted_Test_Case#tcb_test_case{observed_status=Observation}.
+    Live_Model_Ref = callback(Cb_Module, vivify_scenario, [Scenario_Dsl]}),
+    Observation    = callback(Cb_Module, generate_observation, [Live_Model_Ref, Unexecuted_Test_Case]),
+    Unexecuted_Test_Case#scenev_test_case{observed_status=Observation}.
 
--spec passed_test_case(module(), Observed_Test_Case :: tcb_test_case())
+-spec passed_test_case(module(), Observed_Test_Case :: scenev_test_case())
       -> {ok, boolean()}
-             | {error, {expected_status_not_generated, tcb_test_case()}}
-             | {error, {observed_status_not_generated, tcb_test_case()}}.
+             | {error, {expected_status_not_generated, scenev_test_case()}}
+             | {error, {observed_status_not_generated, scenev_test_case()}}.
+            
 %% @doc
 %%   Given a test case that has already been executed and contains an observed
 %%   result status, use the behaviour module to verify if the expected status
 %%   matches the observed status.
 %% @end
-passed_test_case(_Cb_Module, #tcb_test_case{expected_status=?TC_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
+passed_test_case(_Cb_Module, #scenev_test_case{expected_status=?SCENEV_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
     {error, {expected_status_not_generated, Observed_Test_Case}};
-passed_test_case(_Cb_Module, #tcb_test_case{observed_status=?TC_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
+passed_test_case(_Cb_Module, #scenev_test_case{observed_status=?SCENEV_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
     {error, {observed_status_not_generated, Observed_Test_Case}};
-passed_test_case( Cb_Module, #tcb_test_case{scenario=#tcb_scenario{instance=Case_Number}} = Observed_Test_Case)
+passed_test_case( Cb_Module, #scenev_test_case{scenario=#scenev_scenario{instance=Case_Number}} = Observed_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
-    #tcb_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
-    {ok, Cb_Module:passed_test_case(Case_Number, Expected, Observed)}.
+    #scenev_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
+    {ok, callback(Cb_Module, passed_test_case, [Case_Number, Expected, Observed])}
+
+%% @private
+%% @doc
+%%   Executes the modules callback, and logs an error if one is found.
+%% @end
+-spec callback(module(), atom(), [any()]) -> any().
+callback(Mod, Fun, Args)
+  when is_atom(Mod), is_atom(Fun), is_list(Args)->
+    try apply(Mod, Fun, Args)
+    catch Error:Type -> 
+        error_logger:error_msg("Caught ~p error in ~p:~p/~p~n~p",
+                [{Error, Type}, Cb_Module, Fun, length(Args), erlang:get_stacktrace()]),
+        
