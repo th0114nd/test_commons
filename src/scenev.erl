@@ -31,7 +31,9 @@
 
 %% Behaviour callbacks for generating a scenev_model and expected outcomes
 -callback get_all_test_model_ids() -> [{Model_Id :: scenev_model_id(), Source :: scenev_model_source()}].
--callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> Scenario :: scenev_scenario().
+-callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> {single, scenev_scenario()} |
+                                                                                           {many,  [scenev_scenario()]}.
+                                                                                                    
 -callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> Expected_Status :: term().
 
 %% Behaviour callbacks used per scenario when validating against the model
@@ -67,28 +69,20 @@ generate_model(Cb_Module, Model_Id, {file, Full_Name} = Source) ->
     transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios);
 generate_model(Cb_Module, Model_Id, {mfa, {Mfa_Module, Function, Args}} = Source) ->
     {ok, Raw_Scenarios} = apply(Mfa_Module, Function, [Cb_Module, Model_Id | Args]),
-    transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios);
-generate_model(Cb_Module, Model_Id, {function, Function} = Source)
-  when is_function(Function, 1) ->
-    {ok, Raw_Scenarios} = Function(Model_Id),
     transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios).
 
 transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios) ->
     {_, Scenarios} = lists:foldl(fun(Raw_Scenario, {Scenario_Num, Scenarios}) ->
-                                         {Scenario_Num+1,
-                                          [call_transform(Cb_Module, Scenario_Num, Raw_Scenario) | Scenarios]}
-                                 end, {1, []}, Raw_Scenarios),
+                                     {Scenario_Num + 1,
+                                      case exec_callback(Cb_Module, transform_raw_scenario, 
+                                              [Scenario_Num, Raw_Scenario]) of
+                                          {single, Scen} -> [Scen | Scenarios];
+                                          {many, Scens} -> Scens ++ Scenarios;
+                                          _Error -> Scenarios
+                                      end} end, 
+                                  {1, []}, 
+                                  Raw_Scenarios),
     #scenev_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(Scenarios)}.
-
-call_transform(Cb_Module, Scenario_Num, Raw_Scenario) ->
-    try Cb_Module:transform_raw_scenario(Scenario_Num, Raw_Scenario)
-    catch Error:Type ->
-            Err_Type     = {Error, Type},
-            Err_Msg_Args = [Err_Type, erlang:get_stacktrace()],
-            error_logger:error_msg("Scenario translation error: ~p~n~p", [Err_Msg_Args]),
-            Err_Type
-    end.
-    
 
 -spec verify_all_scenarios(Test_Model :: scenev_model()) -> scenev_model_result().
 %% @doc
@@ -130,7 +124,7 @@ verify_all_scenarios(#scenev_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
 %% @end
 generate_test_case(Cb_Module, #scenev_scenario{instance = Case_Number} = Scenario_Instance)
   when is_integer(Case_Number), Case_Number >= 0 ->
-    Expected_Status = callback(Cb_Module, deduce_expected, [Scenario_Instance]),
+    Expected_Status = exec_callback(Cb_Module, deduce_expected, [Scenario_Instance]),
     #scenev_test_case{scenario=Scenario_Instance, expected_status=Expected_Status}.
 
 -spec generate_observed_case(module(), Unexecuted_Test_Case :: scenev_test_case()) -> Result :: scenev_test_case().
@@ -143,8 +137,8 @@ generate_observed_case(Cb_Module,
                        #scenev_test_case{scenario=#scenev_scenario{instance=Case_Number} = Scenario_Dsl,
                                             observed_status=?SCENEV_MISSING_TEST_CASE_ELEMENT} = Unexecuted_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
-    Live_Model_Ref = callback(Cb_Module, vivify_scenario, [Scenario_Dsl]),
-    Observation    = callback(Cb_Module, generate_observation, [Live_Model_Ref, Unexecuted_Test_Case]),
+    Live_Model_Ref = exec_callback(Cb_Module, vivify_scenario, [Scenario_Dsl]),
+    Observation    = exec_callback(Cb_Module, generate_observation, [Live_Model_Ref, Unexecuted_Test_Case]),
     Unexecuted_Test_Case#scenev_test_case{observed_status=Observation}.
 
 -spec passed_test_case(module(), Observed_Test_Case :: scenev_test_case())
@@ -164,18 +158,19 @@ passed_test_case(_Cb_Module, #scenev_test_case{observed_status=?SCENEV_MISSING_T
 passed_test_case( Cb_Module, #scenev_test_case{scenario=#scenev_scenario{instance=Case_Number}} = Observed_Test_Case)
   when is_integer(Case_Number), Case_Number > 0 ->
     #scenev_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
-    {ok, callback(Cb_Module, passed_test_case, [Case_Number, Expected, Observed])}.
+    {ok, exec_callback(Cb_Module, passed_test_case, [Case_Number, Expected, Observed])}.
 
 %% @private
 %% @doc
 %%   Executes the modules callback, and logs an error if one is found.
 %% @end
--spec callback(module(), atom(), [any()]) -> any().
-callback(Mod, Fun, Args)
+-spec exec_callback(module(), atom(), [any()]) -> any().
+exec_callback(Mod, Fun, Args)
   when is_atom(Mod), is_atom(Fun), is_list(Args)->
     try apply(Mod, Fun, Args)
     catch Error:Type -> 
         error_logger:error_msg("Caught ~p error in ~p:~p/~p~n~p",
-                [{Error, Type}, Mod, Fun, length(Args), erlang:get_stacktrace()])
+                [{Error, Type}, Mod, Fun, length(Args), erlang:get_stacktrace()]),
+        {Error, Type}
     end.
         
