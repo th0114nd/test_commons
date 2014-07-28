@@ -11,7 +11,7 @@ data:
 
 csv: data # Extract the middle component and put it in a binary, then remove empties and the pattern.
 	cut -d , -f 2 priv/application.csv \
-		|   sed 's/\(.*\)/"\1"/'\
+		|   sed 's/\(.*\)/"\1"./'\
 		|   grep -v '""'        \
 		|   grep -v Template    \
 		>   priv/mimes.edata
