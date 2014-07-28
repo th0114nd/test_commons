@@ -76,13 +76,13 @@ transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios) ->
                                      {Scenario_Num + 1,
                                       case exec_callback(Cb_Module, transform_raw_scenario, 
                                               [Scenario_Num, Raw_Scenario]) of
-                                          {single, Scen} -> [Scen | Scenarios];
-                                          {many, Scens} -> Scens ++ Scenarios;
+                                          {single, OneScen} -> [[OneScen] | Scenarios];
+                                          {many, ManyScens} -> [ManyScens | Scenarios];
                                           _Error -> Scenarios
                                       end} end, 
                                   {1, []}, 
                                   Raw_Scenarios),
-    #scenev_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(Scenarios)}.
+    #scenev_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(lists:append(Scenarios))}.
 
 -spec verify_all_scenarios(Test_Model :: scenev_model()) -> scenev_model_result().
 %% @doc
@@ -173,4 +173,3 @@ exec_callback(Mod, Fun, Args)
                 [{Error, Type}, Mod, Fun, length(Args), erlang:get_stacktrace()]),
         {Error, Type}
     end.
-        
