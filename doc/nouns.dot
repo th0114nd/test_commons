@@ -1,0 +1,32 @@
+digraph G {
+    Test_Case -> Scenario 
+    Test_Case -> Expected_Status
+    Test_Case -> Observed_Status
+
+    struct1 [shape=record label="<f0> file() | <f1> mfa()"]
+
+    Property -> "[Models]"
+    "[Models]" -> Model
+
+    Model -> ID
+    ID -> "term()"
+    Model -> Source
+    Source -> struct1
+    Model -> Behavior
+    Behavior -> "module()"
+
+    Model -> "[Scenario]"
+    "[Scenario]" -> Scenario
+
+    Scenario -> Instance
+    Instance -> "non_neg_integer()"
+    Scenario -> Scenario_Desc
+    Scenario_Desc -> "term()"
+    Scenario -> Initial_Status
+    Initial_Status -> "term()"
+    Scenario -> Events
+    Events -> "[term()]"
+}
+
+   
+     
