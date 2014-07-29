@@ -1,4 +1,4 @@
-%%  Proper testing occurs via automated scripting of randomly generated
+%%  Proper testing occurs via automated scripting of randomly generated
 %%  scenarios. Each application provides its own customized randomization,
 %%  application behavior, set of event types, and a predictive engine which
 %%  generates the expected solution for a given scenario. A test suite is
@@ -34,9 +34,9 @@
         {
           scenario        :: scenev_scenario(),
           expected_status  = ?SCENEV_MISSING_TEST_CASE_ELEMENT :: scenev_dsl_status()
-                                                            | ?SCENEV_MISSING_TEST_CASE_ELEMENT,
+                                                                | ?SCENEV_MISSING_TEST_CASE_ELEMENT,
           observed_status  = ?SCENEV_MISSING_TEST_CASE_ELEMENT :: scenev_live_status()
-                                                            | ?SCENEV_MISSING_TEST_CASE_ELEMENT
+                                                                | ?SCENEV_MISSING_TEST_CASE_ELEMENT
         }).
 
 -type scenev_test_case() :: #scenev_test_case{}.
