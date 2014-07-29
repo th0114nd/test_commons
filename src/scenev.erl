@@ -39,7 +39,7 @@
 -callback translate_dsl    (scenev_dsl_desc())    -> scenev_live_desc().
 -callback translate_events (scenev_dsl_events())  -> scenev_live_events().
 
--callback generate_observation(scenev_live_ref(), scenev_scenario()) -> Observed_Status :: term().
+-callback generate_observation(scenev_scenario(), scenev_live_ref()) -> Observed_Status :: term().
 
 -callback passed_test_case(Case_Number     :: pos_integer(),
                            Expected_Status :: scenev_dsl_status(),
@@ -54,10 +54,11 @@
 %% Cb_Module is the callback module provided by the model instance.
 -spec test_all_models(module()) -> [{scenev_model_id(), scenev_model_result()}].
 test_all_models(Cb_Module) ->
+    {ok, IDs} = exec_callback(Cb_Module, get_all_test_model_ids, []),
     [begin
          Test_Model = generate_model(Cb_Module, Model_Id, Source),
          {Model_Id, verify_all_scenarios(Test_Model)}
-     end || {ok, {Model_Id, Source}} <- exec_callback(Cb_Module, get_all_test_model_ids, [])].
+     end || {Model_Id, Source} <- IDs].
 
 -spec generate_model(module(), scenev_model_id(), scenev_model_source()) -> scenev_model().
 generate_model(Cb_Module, Model_Id, {file, Full_Name} = Source) ->
@@ -92,7 +93,7 @@ verify_all_scenarios(#scenev_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
                                                                    Case_Number > 0, 
                                                                    is_boolean(Result),
                                                                    is_integer(Success_Count),
-                                                                   Success_Count > 0,
+                                                                   Success_Count >= 0,
                                                                    is_list(Failures) ->
                         try
                             {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
