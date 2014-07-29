@@ -87,35 +87,43 @@ transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios) ->
 %% @end
 verify_all_scenarios(#scenev_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
     {Success, Success_Case_Count, Failed_Cases}
-        = lists:foldl(fun(#scenev_scenario{instance=Case_Number} = Scenario,
-                          {Result, Success_Count, Failures}) when is_integer(Case_Number), 
-                                                                   Case_Number > 0, 
-                                                                   is_boolean(Result),
-                                                                   is_integer(Success_Count),
-                                                                   Success_Count >= 0,
-                                                                   is_list(Failures) ->
-                        try
-                            {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
-                            {ok, Live_Ref} = exec_callback(Cb_Module, vivify_scenario,      [Scenario]),
-                            {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario, Live_Ref]),
-                            Test_Case = #scenev_test_case{scenario = Scenario,
-                                                          expected_status = Expected,
-                                                          observed_status = Observed},
-                            case passed_test_case(Cb_Module, Test_Case) of
-                                %% Errors should not be possible as we have filled in Observed_Case properly.
-                                {ok, true}  -> {Result, Success_Count+1, Failures};
-                                {ok, false} -> {false,  Success_Count,   [Test_Case | Failures]}
-                            end
-                        catch Error:Type ->
-                                error_logger:error_msg("Scenario instance ~p crashed with ~p~n  Stacktrace: ~p~n",
-                                                       [Scenario, {Error, Type}, erlang:get_stacktrace()]),
-                                {false, Success_Count, [Scenario | Failures]}
-                        end
-                end,
-                {true, 0, []},
-                Scenarios),
+       = lists:foldl(run_all(Cb_Module), {true, 0, []}, Scenarios),
     {Success, Success_Case_Count, lists:reverse(Failed_Cases)}.
 
+-type loop_acc() :: {boolean(), non_neg_integer(), [scenev_test_case()]}.
+-type loop_func() :: fun(([scenev_scenario()], loop_acc()) -> loop_acc()).
+-spec run_all(module()) -> loop_func().
+run_all(Cb_Module)
+  when is_atom(Cb_Module) ->
+    fun (#scenev_scenario{instance = Case_Number} = Scenario, {Result, Success_Count, Failures})
+      when is_integer(Case_Number), Case_Number > 0,
+           is_boolean(Result),
+           is_integer(Success_Count), Success_Count >= 0,
+           is_list(Failures) ->
+        try case evaluate(Cb_Module, Scenario) of
+                true  -> {Result, Success_Count+1, Failures};
+                {false, Test_Case} -> {false,  Success_Count,   [Test_Case | Failures]}
+            end
+        catch Error:Type ->
+                error_logger:error_msg("Scenario instance ~p crashed with ~p~n  Stacktrace: ~p~n",
+                                       [Scenario, {Error, Type}, erlang:get_stacktrace()]),
+                {false, Success_Count, [Scenario | Failures]}
+        end
+     end.
+
+-spec evaluate(module(), scenev_scenario()) -> true | {false, scenev_test_case()}.
+evaluate(Cb_Module, #scenev_scenario{} = Scenario)
+  when is_atom(Cb_Module) ->
+    {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
+    {ok, Live_Ref} = exec_callback(Cb_Module, vivify_scenario,      [Scenario]),
+    {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario, Live_Ref]),
+    Test_Case = #scenev_test_case{scenario = Scenario,
+                                  expected_status = Expected,
+                                  observed_status = Observed},
+    case passed_test_case(Cb_Module, Test_Case) of
+        {ok, true} -> true;
+        {ok, false} -> {false, Test_Case}
+    end.
 
 %%-------------------------------------------------------------------
 %% Internal API steps used to validate a single scenario.
@@ -139,11 +147,11 @@ passed_test_case( Cb_Module, #scenev_test_case{scenario=#scenev_scenario{instanc
     #scenev_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
     exec_callback(Cb_Module, passed_test_case, [Case_Number, Expected, Observed]).
 
+-spec exec_callback(module(), atom(), [any()]) -> any().
 %% @private
 %% @doc
 %%   Executes the modules callback, and logs an error if one is found.
 %% @end
--spec exec_callback(module(), atom(), [any()]) -> any().
 exec_callback(Mod, Fun, Args)
   when is_atom(Mod), is_atom(Fun), is_list(Args)->
     try {ok, apply(Mod, Fun, Args)}
