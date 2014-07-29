@@ -50,7 +50,6 @@
         {
           id             :: scenev_model_id(),      % Unique identifier
           source         :: scenev_model_source(),  % Source of the model
-          behaviour      :: module(),                  % Implementation of the scenev_model behaviour
           scenarios = [] :: [scenev_scenario()]     % A set of scenarios to be tested
         }).
 

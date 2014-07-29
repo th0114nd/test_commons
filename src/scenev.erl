@@ -16,8 +16,7 @@
 
 %% External API: Certifying code against a set of proper model instances.
 -export([
-         test_all_models/1,
-         verify_all_scenarios/1
+         test_all_models/1
         ]).
 
 %% Steps used to validate a single scenario.
@@ -55,19 +54,20 @@
 test_all_models(Cb_Module) ->
     {ok, IDs} = exec_callback(Cb_Module, get_all_test_model_ids, []),
     [begin
-         Test_Model = generate_model(Cb_Module, Model_Id, Source),
-         {Model_Id, verify_all_scenarios(Test_Model)}
+         Scenarios = generate_model(Cb_Module, Source),
+         {Model_Id, verify_all_scenarios(Cb_Module, Scenarios)}
      end || {Model_Id, Source} <- IDs].
 
--spec generate_model(module(), scenev_model_id(), scenev_model_source()) -> scenev_model().
-generate_model(Cb_Module, Model_Id, {file, Full_Name} = Source) ->
+-spec generate_model(module(), scenev_model_source()) -> [scenev_scenario()].
+generate_model(Cb_Module, {file, Full_Name} = _Source) ->
     {ok, Raw_Scenarios} = file:consult(Full_Name),
-    transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios);
-generate_model(Cb_Module, Model_Id, {mfa, {Mfa_Module, Function, Args}} = Source) ->
-    {ok, Raw_Scenarios} = apply(Mfa_Module, Function, [Cb_Module, Model_Id | Args]),
-    transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios).
+    transform_raw_scenarios(Cb_Module, Raw_Scenarios);
+generate_model(Cb_Module, {mfa, {Mfa_Module, Function, Args}} = _Source) ->
+    {ok, Raw_Scenarios} = apply(Mfa_Module, Function, Args),
+    transform_raw_scenarios(Cb_Module, Raw_Scenarios).
 
-transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios) ->
+-spec transform_raw_scenarios(module(), [term()]) -> [scenev_scenario()].
+transform_raw_scenarios(Cb_Module, Raw_Scenarios) ->
     {_, Scenarios} = lists:foldl(fun(Raw_Scenario, {Scenario_Num, Scenarios}) ->
                                      {Scenario_Num + 1,
                                       case exec_callback(Cb_Module, transform_raw_scenario, 
@@ -78,14 +78,15 @@ transform_raw_scenarios(Cb_Module, Model_Id, Source, Raw_Scenarios) ->
                                       end} end, 
                                   {1, []}, 
                                   Raw_Scenarios),
-    #scenev_model{id=Model_Id, source=Source, behaviour=Cb_Module, scenarios=lists:reverse(lists:append(Scenarios))}.
+    lists:reverse(lists:append(Scenarios)).
 
--spec verify_all_scenarios(Test_Model :: scenev_model()) -> scenev_model_result().
+-spec verify_all_scenarios(module(), Scenarios :: [scenev_scenario()]) -> scenev_model_result().
 %% @doc
 %%   Given a model and corresponding scenarios, generate observed test cases and
 %%   validate that they all pass.
 %% @end
-verify_all_scenarios(#scenev_model{behaviour=Cb_Module, scenarios=Scenarios}) ->
+verify_all_scenarios(Cb_Module, Scenarios)
+  when is_atom(Cb_Module), is_list(Scenarios) ->
     {Success, Success_Case_Count, Failed_Cases}
        = lists:foldl(run_all(Cb_Module), {true, 0, []}, Scenarios),
     {Success, Success_Case_Count, lists:reverse(Failed_Cases)}.
