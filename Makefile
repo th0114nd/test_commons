@@ -16,6 +16,10 @@ csv: data # Extract the middle component and put it in a binary, then remove emp
 		|   grep -v Template    \
 		>   priv/mimes.edata
 
+images:
+	mkdir -p doc/images
+	dot -Tpng doc/nouns.dot -o doc/images/nouns.png
+
 clean-data:
 	rm priv/application.csv
 	rm priv/mimes.edata
