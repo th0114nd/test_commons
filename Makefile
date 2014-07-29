@@ -3,6 +3,8 @@ PROJECT = test_commons
 DIALYZER_OPTS := -Werror_handling \
 			     -Wrace_conditions \
 			     -Wunmatched_returns 
+DEPS = proper
+dep_proper = pkg://proper
 
 include erlang.mk
 
