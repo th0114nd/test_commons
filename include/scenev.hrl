@@ -42,17 +42,9 @@
 -type scenev_test_case() :: #scenev_test_case{}.
 
 -type scenev_model_id()     :: term().
--type scenev_model_source() :: {file, file:name_all()}
-                                | {mfa, {Module::module(), Function::atom(), Args::list()}}.
+-type scenev_source() :: {file, file:name_all()}
+                       | {mfa, {Module::module(), Function::atom(), Args::list()}}.
 
-%% The full Test Common Behavior model
--record(scenev_model,
-        {
-          id             :: scenev_model_id(),      % Unique identifier
-          source         :: scenev_model_source(),  % Source of the model
-          scenarios = [] :: [scenev_scenario()]     % A set of scenarios to be tested
-        }).
-
--type scenev_model()        :: #scenev_model{}.
--type scenev_model_result() :: {boolean(), Number_Of_Passed_Scenarios :: pos_integer(),
-                                   Failed_Scenarios :: [scenev_scenario()]}.
+-type scenev_result() :: {Result :: boolean(),
+                          Number_Of_Passed_Scenarios :: pos_integer(),
+                          Failed_Scenarios :: [scenev_scenario()]}.

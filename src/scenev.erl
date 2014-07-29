@@ -1,5 +1,5 @@
 %% @doc
-%%   A scenev_model is a behaviour which describes a scenario and a set of events,
+%%   scenev (Scenario Events) is a behaviour which describes a scenario and a set of events,
 %%   deduces the expected results and then observes and compares the actual results when
 %%   the events are fed to the scenario. The scenario is expected to be a description
 %%   of a running erlang configuration (e.g., a supervisor hierarchy with children),
@@ -27,7 +27,7 @@
 -include("scenev.hrl").
 
 %% Behaviour callbacks for generating a scenev_model and expected outcomes
--callback get_all_test_model_ids() -> [{Model_Id :: scenev_model_id(), Source :: scenev_model_source()}].
+-callback get_all_test_model_ids() -> [{Model_Id :: scenev_model_id(), Source :: scenev_source()}].
 -callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> {single, scenev_scenario()} |
                                                                                            {many,  [scenev_scenario()]}.
 -callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> Expected_Status :: term().
@@ -50,21 +50,20 @@
 %%-------------------------------------------------------------------
 
 %% Cb_Module is the callback module provided by the model instance.
--spec test_all_models(module()) -> [{scenev_model_id(), scenev_model_result()}].
+-spec test_all_models(module()) -> [{scenev_model_id(), scenev_result()}].
 test_all_models(Cb_Module) ->
     {ok, IDs} = exec_callback(Cb_Module, get_all_test_model_ids, []),
     [begin
-         Scenarios = generate_model(Cb_Module, Source),
+         {ok, Raw_Scenarios} = generate_raw(Source),
+         Scenarios = transform_raw_scenarios(Cb_Module, Raw_Scenarios),
          {Model_Id, verify_all_scenarios(Cb_Module, Scenarios)}
      end || {Model_Id, Source} <- IDs].
 
--spec generate_model(module(), scenev_model_source()) -> [scenev_scenario()].
-generate_model(Cb_Module, {file, Full_Name} = _Source) ->
-    {ok, Raw_Scenarios} = file:consult(Full_Name),
-    transform_raw_scenarios(Cb_Module, Raw_Scenarios);
-generate_model(Cb_Module, {mfa, {Mfa_Module, Function, Args}} = _Source) ->
-    {ok, Raw_Scenarios} = apply(Mfa_Module, Function, Args),
-    transform_raw_scenarios(Cb_Module, Raw_Scenarios).
+-spec generate_raw(scenev_source()) -> [term()].
+generate_raw({file, Full_Name} = _Source) ->
+    file:consult(Full_Name);
+generate_raw({mfa, {Mfa_Module, Function, Args}} = _Source) ->
+    apply(Mfa_Module, Function, Args).
 
 -spec transform_raw_scenarios(module(), [term()]) -> [scenev_scenario()].
 transform_raw_scenarios(Cb_Module, Raw_Scenarios) ->
@@ -80,9 +79,9 @@ transform_raw_scenarios(Cb_Module, Raw_Scenarios) ->
                                   Raw_Scenarios),
     lists:reverse(lists:append(Scenarios)).
 
--spec verify_all_scenarios(module(), Scenarios :: [scenev_scenario()]) -> scenev_model_result().
+-spec verify_all_scenarios(module(), Scenarios :: [scenev_scenario()]) -> scenev_result().
 %% @doc
-%%   Given a model and corresponding scenarios, generate observed test cases and
+%%   Given a module and corresponding scenarios, generate observed test cases and
 %%   validate that they all pass.
 %% @end
 verify_all_scenarios(Cb_Module, Scenarios)
