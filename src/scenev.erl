@@ -31,7 +31,6 @@
 -callback get_all_test_model_ids() -> [{Model_Id :: scenev_model_id(), Source :: scenev_model_source()}].
 -callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> {single, scenev_scenario()} |
                                                                                            {many,  [scenev_scenario()]}.
-                                                                                                    
 -callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> Expected_Status :: term().
 
 %% Behaviour callbacks used per scenario when validating against the model
