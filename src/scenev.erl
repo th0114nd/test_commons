@@ -53,7 +53,10 @@ test_all_models(Cb_Module) ->
 generate_raw({file, Full_Name} = _Source) ->
     file:consult(Full_Name);
 generate_raw({mfa, {Mfa_Module, Function, Args}} = _Source) ->
-    apply(Mfa_Module, Function, Args).
+    apply(Mfa_Module, Function, Args);
+generate_raw({dir, DirName}) ->
+    Pairs = [{filename:rootname(File), filename:absname(DirName ++ File)} || File <- Files],
+    [{list_to_atom(Test_Name), generate_raw({file, Abs_Path})} || {Test_Name, Abs_Path} <- Pairs]
 
 -spec transform_raw_scenarios(module(), [term()]) -> [scenev_scenario()].
 transform_raw_scenarios(Cb_Module, Raw_Scenarios) ->
@@ -101,40 +104,23 @@ run_all(Cb_Module)
      end.
 
 -spec evaluate(module(), scenev_scenario()) -> true | {false, scenev_test_case()}.
-evaluate(Cb_Module, #scenev_scenario{} = Scenario)
+evaluate(Cb_Module, #scenev_scenario{instance = Case_Number} = Scenario)
   when is_atom(Cb_Module) ->
     {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
     {ok, Live_Ref} = exec_callback(Cb_Module, vivify_scenario,      [Scenario]),
     {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario, Live_Ref]),
-    Test_Case = #scenev_test_case{scenario = Scenario,
-                                  expected_status = Expected,
-                                  observed_status = Observed},
-    case passed_test_case(Cb_Module, Test_Case) of
+    ok = exec_callback(Cb_Module, murder_scenario, [Scenario, Live_Ref]),
+    case exec_callback(Cb_Module, passed_test_case, [Case_Number, Observed, Expected]) of
         {ok, true} -> true;
-        {ok, false} -> {false, Test_Case}
+        {ok, false} -> Test_Case = #scenev_test_case{scenario = Scenario,
+                                                     expected_status = Expected,
+                                                     observed_status = Observed},
+                       {false, Test_Case}
     end.
 
 %%-------------------------------------------------------------------
 %% Internal API steps used to validate a single scenario.
 %%-------------------------------------------------------------------
-
--spec passed_test_case(module(), Observed_Test_Case :: scenev_test_case())
-      -> {ok, boolean()}
-             | {error, {expected_status_not_generated, scenev_test_case()}}
-             | {error, {observed_status_not_generated, scenev_test_case()}}.
-%% @doc
-%%   Given a test case that has already been executed and contains an observed
-%%   result status, use the behaviour module to verify if the expected status
-%%   matches the observed status.
-%% @end
-passed_test_case(_Cb_Module, #scenev_test_case{expected_status=?SCENEV_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
-    {error, {expected_status_not_generated, Observed_Test_Case}};
-passed_test_case(_Cb_Module, #scenev_test_case{observed_status=?SCENEV_MISSING_TEST_CASE_ELEMENT} = Observed_Test_Case) ->
-    {error, {observed_status_not_generated, Observed_Test_Case}};
-passed_test_case( Cb_Module, #scenev_test_case{scenario=#scenev_scenario{instance=Case_Number}} = Observed_Test_Case)
-  when is_integer(Case_Number), Case_Number > 0 ->
-    #scenev_test_case{expected_status=Expected, observed_status=Observed} = Observed_Test_Case,
-    exec_callback(Cb_Module, passed_test_case, [Case_Number, Expected, Observed]).
 
 -spec exec_callback(module(), atom(), [any()]) -> any().
 %% @private
