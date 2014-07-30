@@ -116,7 +116,7 @@ evaluate(Cb_Module, #scenev_scenario{instance = Case_Number} = Scenario)
     {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
     {ok, Live_Ref} = exec_callback(Cb_Module, vivify_scenario,      [Scenario]),
     {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario, Live_Ref]),
-    ok = exec_callback(Cb_Module, murder_scenario, [Live_Ref]),
+    {ok, ok}       = exec_callback(Cb_Module, murder_scenario, [Live_Ref]),
     case exec_callback(Cb_Module, passed_test_case, [Case_Number, Observed, Expected]) of
         {ok, true} -> true;
         {ok, false} -> Test_Case = #scenev_test_case{scenario = Scenario,
