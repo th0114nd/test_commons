@@ -51,9 +51,9 @@ test_all_models(Cb_Module) ->
          {Model_Id, verify_all_scenarios(Cb_Module, Scenarios)}
      end || {Model_Id, Source} <- NewIDs].
 
-expand_dir({dir, Dir}) ->
+expand_dir({Id, {dir, Dir}}) ->
     {ok, Files} = file:list_dir(Dir),
-    Pairs = [{Dir ++ filename:rootname(File), filename:absname(Dir ++ File)} || File <- Files],
+    Pairs = [{Id ++ [$/ | filename:rootname(File)], filename:absname(Dir ++ File)} || File <- Files],
     [{Test_Name, {file, File_Name}} || {Test_Name, File_Name} <- Pairs];
 expand_dir(X) -> [X].
 
