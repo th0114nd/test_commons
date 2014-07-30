@@ -15,14 +15,7 @@
 -module(scenev).
 
 %% External API: Certifying code against a set of proper model instances.
--export([
-         test_all_models/1
-        ]).
-
-%% Steps used to validate a single scenario.
--export([
-         passed_test_case/2
-        ]).
+-export([test_all_models/1]).
 
 -include("scenev.hrl").
 
@@ -34,9 +27,6 @@
 
 %% Behaviour callbacks used per scenario when validating against the model
 -callback vivify_scenario  (scenev_scenario())    -> scenev_live_ref().
--callback translate_dsl    (scenev_dsl_desc())    -> scenev_live_desc().
--callback translate_events (scenev_dsl_events())  -> scenev_live_events().
-
 -callback generate_observation(scenev_scenario(), scenev_live_ref()) -> Observed_Status :: term().
 
 -callback passed_test_case(Case_Number     :: pos_integer(),
@@ -100,10 +90,9 @@ run_all(Cb_Module)
            is_boolean(Result),
            is_integer(Success_Count), Success_Count >= 0,
            is_list(Failures) ->
-        try case evaluate(Cb_Module, Scenario) of
+        try evaluate(Cb_Module, Scenario) of
                 true  -> {Result, Success_Count+1, Failures};
                 {false, Test_Case} -> {false,  Success_Count,   [Test_Case | Failures]}
-            end
         catch Error:Type ->
                 error_logger:error_msg("Scenario instance ~p crashed with ~p~n  Stacktrace: ~p~n",
                                        [Scenario, {Error, Type}, erlang:get_stacktrace()]),
