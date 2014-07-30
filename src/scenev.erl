@@ -45,6 +45,7 @@ test_all_models(Cb_Module) ->
     {ok, IDs} = exec_callback(Cb_Module, get_all_test_model_ids, []),
     error_logger:info_msg("IDs: ~p~n", [IDs]),
     NewIDs = lists:append([expand_dir(ID) || ID <- IDs]),
+    error_logger:info_msg("NewIDs: ~p~n", [NewIDs]),
     [begin
          {ok, Raw_Scenarios} = generate_raw(Source),
          Scenarios = transform_raw_scenarios(Cb_Module, Raw_Scenarios),
