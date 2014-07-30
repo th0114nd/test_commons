@@ -43,20 +43,24 @@
 -spec test_all_models(module()) -> [{scenev_model_id(), scenev_result()}].
 test_all_models(Cb_Module) ->
     {ok, IDs} = exec_callback(Cb_Module, get_all_test_model_ids, []),
+    {ok, NewIDs} = lists:append([expand_dir(ID) || ID <- IDs]),
     [begin
          {ok, Raw_Scenarios} = generate_raw(Source),
          Scenarios = transform_raw_scenarios(Cb_Module, Raw_Scenarios),
          {Model_Id, verify_all_scenarios(Cb_Module, Scenarios)}
-     end || {Model_Id, Source} <- IDs].
+     end || {Model_Id, Source} <- NewIDs].
+
+expand_dir({dir, Dir}) ->
+    {ok, Files} = file:list_dir(Dir),
+    Pairs = [{Dir ++ filename:rootname(File), filename:absname(Dir ++ File)} || File <- Files],
+    [{Test_Name, {file, File_Name}} || {Test_Name, File_Name} <- Pairs];
+expand_dir(X) -> [X].
 
 -spec generate_raw(scenev_source()) -> [term()].
 generate_raw({file, Full_Name} = _Source) ->
     file:consult(Full_Name);
 generate_raw({mfa, {Mfa_Module, Function, Args}} = _Source) ->
-    apply(Mfa_Module, Function, Args);
-generate_raw({dir, DirName}) ->
-    Pairs = [{filename:rootname(File), filename:absname(DirName ++ File)} || File <- Files],
-    [{list_to_atom(Test_Name), generate_raw({file, Abs_Path})} || {Test_Name, Abs_Path} <- Pairs]
+    apply(Mfa_Module, Function, Args).
 
 -spec transform_raw_scenarios(module(), [term()]) -> [scenev_scenario()].
 transform_raw_scenarios(Cb_Module, Raw_Scenarios) ->
