@@ -49,17 +49,18 @@ test_all_models(Cb_Module) ->
          {Model_Id, verify_all_scenarios(Cb_Module, Scenarios)}
      end || {Model_Id, Source} <- NewIDs].
 
+-spec expand_dir({scenev_model_id(), scenev_source()}) -> [{scenev_model_id(), scenev_source()}].
 expand_dir({Id, {dir, Dir}}) ->
     {ok, Files} = file:list_dir(Dir),
     Pairs = [{Id ++ [$/ | filename:rootname(File)], filename:absname(Dir ++ File)} || File <- Files],
     [{Test_Name, {file, File_Name}} || {Test_Name, File_Name} <- Pairs];
 expand_dir(X) -> [X].
 
--spec generate_raw(scenev_source()) -> [term()].
+-spec generate_raw(scenev_source()) -> {ok, [term()]}.
 generate_raw({file, Full_Name} = _Source) ->
     file:consult(Full_Name);
 generate_raw({mfa, {Mfa_Module, Function, Args}} = _Source) ->
-    apply(Mfa_Module, Function, Args).
+    {ok, apply(Mfa_Module, Function, Args)}.
 
 -spec transform_raw_scenarios(module(), [term()]) -> [scenev_scenario()].
 transform_raw_scenarios(Cb_Module, Raw_Scenarios) ->

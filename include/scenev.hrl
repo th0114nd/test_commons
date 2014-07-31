@@ -29,7 +29,7 @@
 %% An test case is a scenario augmented with expected and observered statuses
 -record(scenev_test_case,
         {
-          scenario        :: scenev_scenario(),
+          scenario         :: scenev_scenario(),
           expected_status  :: scenev_dsl_status(),
           observed_status  :: scenev_live_status()
         }).
@@ -38,9 +38,9 @@
 
 -type scenev_model_id()  :: term().
 -type scenev_source() :: {file, file:name_all()}
-                       | {dir, [file:name_all()]}
+                       | {dir,  file:name_all()}
                        | {mfa, {Module::module(), Function::atom(), Args::list()}}.
 
 -type scenev_result() :: {Result :: boolean(),
-                          Number_Of_Passed_Scenarios :: pos_integer(),
+                          Number_Of_Passed_Scenarios :: non_neg_integer(),
                           Failed_Scenarios :: [scenev_scenario()]}.
