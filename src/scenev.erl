@@ -26,9 +26,7 @@
 -callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> Expected_Status :: term().
 
 %% Behaviour callbacks used per scenario when validating against the model
--callback vivify_scenario  (scenev_scenario())    -> scenev_live_ref().
--callback murder_scenario  (scenev_live_ref())    -> ok.
--callback generate_observation(scenev_scenario(), scenev_live_ref()) -> Observed_Status :: term().
+-callback generate_observation(scenev_scenario()) -> Observed_Status :: term().
 
 -callback passed_test_case(Case_Number     :: pos_integer(),
                            Expected_Status :: scenev_dsl_status(),
@@ -112,9 +110,7 @@ run_all(Cb_Module)
 evaluate(Cb_Module, #scenev_scenario{instance = Case_Number} = Scenario)
   when is_atom(Cb_Module) ->
     {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
-    {ok, Live_Ref} = exec_callback(Cb_Module, vivify_scenario,      [Scenario]),
-    {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario, Live_Ref]),
-    {ok, ok}       = exec_callback(Cb_Module, murder_scenario, [Live_Ref]),
+    {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario]),
     case exec_callback(Cb_Module, passed_test_case, [Case_Number, Observed, Expected]) of
         {ok, true} -> true;
         {ok, false} -> Test_Case = #scenev_test_case{scenario = Scenario,
