@@ -27,33 +27,20 @@
 -type scenev_scenario() :: #scenev_scenario{}.
 
 %% An test case is a scenario augmented with expected and observered statuses
--define(SCENEV_MISSING_TEST_CASE_ELEMENT, '$$_not_generated').
--define(SCENEV_CALLBACK_FAILURE, '$$_cb_failure').
-
 -record(scenev_test_case,
         {
-          scenario        :: scenev_scenario(),
-          expected_status  = ?SCENEV_MISSING_TEST_CASE_ELEMENT :: scenev_dsl_status()
-                                                                | ?SCENEV_MISSING_TEST_CASE_ELEMENT,
-          observed_status  = ?SCENEV_MISSING_TEST_CASE_ELEMENT :: scenev_live_status()
-                                                                | ?SCENEV_MISSING_TEST_CASE_ELEMENT
+          scenario         :: scenev_scenario(),
+          expected_status  :: scenev_dsl_status(),
+          observed_status  :: scenev_live_status()
         }).
 
 -type scenev_test_case() :: #scenev_test_case{}.
 
--type scenev_model_id()     :: term().
--type scenev_model_source() :: {file, file:name_all()}
-                                | {mfa, {Module::module(), Function::atom(), Args::list()}}.
+-type scenev_model_id()  :: term().
+-type scenev_source() :: {file, file:name_all()}
+                       | {dir,  file:name_all()}
+                       | {mfa, {Module::module(), Function::atom(), Args::list()}}.
 
-%% The full Test Common Behavior model
--record(scenev_model,
-        {
-          id             :: scenev_model_id(),      % Unique identifier
-          source         :: scenev_model_source(),  % Source of the model
-          behaviour      :: module(),                  % Implementation of the scenev_model behaviour
-          scenarios = [] :: [scenev_scenario()]     % A set of scenarios to be tested
-        }).
-
--type scenev_model()        :: #scenev_model{}.
--type scenev_model_result() :: {boolean(), Number_Of_Passed_Scenarios :: pos_integer(),
-                                   Failed_Scenarios :: [scenev_scenario()]}.
+-type scenev_result() :: {Result :: boolean(),
+                          Number_Of_Passed_Scenarios :: non_neg_integer(),
+                          Failed_Scenarios :: [scenev_scenario()]}.
