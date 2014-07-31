@@ -98,7 +98,7 @@ run_all(Cb_Module)
            is_integer(Success_Count), Success_Count >= 0,
            is_list(Failures) ->
         try evaluate(Cb_Module, Scenario) of
-                true  -> {Result, Success_Count+1, Failures};
+                {true, Test_Case}  -> {Result, Success_Count+1, Failures};
                 {false, Test_Case} -> {false,  Success_Count,   [Test_Case | Failures]}
         catch Error:Type ->
                 error_logger:error_msg("Scenario instance ~p crashed with ~p~n  Stacktrace: ~p~n",
@@ -107,18 +107,16 @@ run_all(Cb_Module)
         end
      end.
 
--spec evaluate(module(), scenev_scenario()) -> true | {false, scenev_test_case()}.
+-spec evaluate(module(), scenev_scenario()) -> {boolean(), scenev_test_case()}.
 evaluate(Cb_Module, #scenev_scenario{instance = Case_Number} = Scenario)
   when is_atom(Cb_Module) ->
     {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
     {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario]),
-    case exec_callback(Cb_Module, passed_test_case, [Case_Number, Observed, Expected]) of
-        {ok, true} -> true;
-        {ok, false} -> Test_Case = #scenev_test_case{scenario = Scenario,
-                                                     expected_status = Expected,
-                                                     observed_status = Observed},
-                       {false, Test_Case}
-    end.
+    {ok, Res} = exec_callback(Cb_Module, passed_test_case, [Case_Number, Observed, Expected])
+    Test_Case = #scenev_test_case{scenario = Scenario,
+                                   expected_status = Expected,
+                                   observed_status = Observed},
+    {Res, Test_Case}.
 
 %%-------------------------------------------------------------------
 %% Internal API steps used to validate a single scenario.
