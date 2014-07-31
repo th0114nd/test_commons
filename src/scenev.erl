@@ -112,7 +112,7 @@ evaluate(Cb_Module, #scenev_scenario{instance = Case_Number} = Scenario)
   when is_atom(Cb_Module) ->
     {ok, Expected} = exec_callback(Cb_Module, deduce_expected,      [Scenario]),
     {ok, Observed} = exec_callback(Cb_Module, generate_observation, [Scenario]),
-    {ok, Res} = exec_callback(Cb_Module, passed_test_case, [Case_Number, Observed, Expected])
+    {ok, Res} = exec_callback(Cb_Module, passed_test_case, [Case_Number, Observed, Expected]),
     Test_Case = #scenev_test_case{scenario = Scenario,
                                    expected_status = Expected,
                                    observed_status = Observed},
