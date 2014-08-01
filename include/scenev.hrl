@@ -30,8 +30,8 @@
 -record(scenev_test_case,
         {
           scenario         :: scenev_scenario(),
-          expected_status  :: scenev_dsl_status(),
-          observed_status  :: scenev_live_status()
+          expected_status  :: scenev_expected_status(),
+          observed_status  :: scenev_observed_status()
         }).
 
 -type scenev_test_case() :: #scenev_test_case{}.

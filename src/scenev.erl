@@ -23,14 +23,14 @@
 -callback get_all_test_model_ids() -> [{Model_Id :: scenev_model_id(), Source :: scenev_source()}].
 -callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> {single, scenev_scenario()} |
                                                                                            {many,  [scenev_scenario()]}.
--callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> Expected_Status :: term().
+-callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> scenev_expected_status().
 
 %% Behaviour callbacks used per scenario when validating against the model
--callback generate_observation(scenev_scenario()) -> Observed_Status :: term().
+-callback generate_observation(scenev_scenario()) -> scenev_observed_status().
 
--callback passed_test_case(Case_Number     :: pos_integer(),
-                           Expected_Status :: scenev_dsl_status(),
-                           Observed_Status :: scenev_live_status())
+-callback passed_test_case(Case_Number :: pos_integer(),
+                           scenev_expected_status(),
+                           scenev_observed_status())
               -> boolean().
 
 
