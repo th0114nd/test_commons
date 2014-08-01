@@ -6,21 +6,22 @@
 
 %% All types used to express the DSL description of a scenario
 -type scenev_dsl_desc()    :: term().
--type scenev_dsl_status()  :: term().
 -type scenev_dsl_events()  :: [term()].
 
 %% All types used to express the live implementation of a scenario
 -type scenev_live_ref()    :: term().
 -type scenev_live_desc()   :: term().
--type scenev_live_status() :: term().
 -type scenev_live_events() :: [term()].
+
+-type scenev_expected_status() :: term().
+-type scenev_observed_status() :: term().
 
 %% An instance of a scenario description using DSL
 -record(scenev_scenario,
         {
           instance = 0     :: non_neg_integer(),                % Scenario instance id
           scenario_desc    :: scenev_dsl_desc(),    % Description of the scenario
-          initial_status   :: scenev_dsl_status(),  % Initial status for the scenario
+          initial_status   :: scenev_observed_status(),  % Initial status for the scenario
           events = []      :: scenev_dsl_events()   % Set of events to occur during test
         }).
 
@@ -42,5 +43,5 @@
                        | {mfa, {Module::module(), Function::atom(), Args::list()}}.
 
 -type scenev_result() :: {Result :: boolean(),
-                          Number_Of_Passed_Scenarios :: non_neg_integer(),
+                          Passed_Scenarios :: [scenev_scenario()],
                           Failed_Scenarios :: [scenev_scenario()]}.
