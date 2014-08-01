@@ -83,27 +83,27 @@ transform_raw_scenarios(Cb_Module, Raw_Scenarios) ->
 %% @end
 verify_all_scenarios(Cb_Module, Scenarios)
   when is_atom(Cb_Module), is_list(Scenarios) ->
-    {Success, Success_Case_Count, Failed_Cases}
-       = lists:foldl(run_all(Cb_Module), {true, 0, []}, Scenarios),
-    {Success, Success_Case_Count, lists:reverse(Failed_Cases)}.
+    {Success, Success_Cases, Failed_Cases}
+       = lists:foldl(run_all(Cb_Module), {true, [], []}, Scenarios),
+    {Success, lists:reverse(Success_Cases), lists:reverse(Failed_Cases)}.
 
 -type loop_acc() :: {boolean(), non_neg_integer(), [scenev_test_case()]}.
 -type loop_func() :: fun(([scenev_scenario()], loop_acc()) -> loop_acc()).
 -spec run_all(module()) -> loop_func().
 run_all(Cb_Module)
   when is_atom(Cb_Module) ->
-    fun (#scenev_scenario{instance = Case_Number} = Scenario, {Result, Success_Count, Failures})
+    fun (#scenev_scenario{instance = Case_Number} = Scenario, {Result, Successes, Failures})
       when is_integer(Case_Number), Case_Number > 0,
            is_boolean(Result),
-           is_integer(Success_Count), Success_Count >= 0,
+           is_list(Successes),
            is_list(Failures) ->
         try evaluate(Cb_Module, Scenario) of
-                {true, Test_Case}  -> {Result, Success_Count+1, Failures};
-                {false, Test_Case} -> {false,  Success_Count,   [Test_Case | Failures]}
+                {true,  Test_Case} -> {Result, [Test_Case | Successes], Failures};
+                {false, Test_Case} -> {false,  Successes,  [Test_Case | Failures]}
         catch Error:Type ->
                 error_logger:error_msg("Scenario instance ~p crashed with ~p~n  Stacktrace: ~p~n",
                                        [Scenario, {Error, Type}, erlang:get_stacktrace()]),
-                {false, Success_Count, [Scenario | Failures]}
+                {false, Successes, [Scenario | Failures]}
         end
      end.
 
