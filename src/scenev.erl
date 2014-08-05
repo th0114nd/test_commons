@@ -20,7 +20,7 @@
 -include("scenev.hrl").
 
 %% Behaviour callbacks for generating a scenev_model and expected outcomes
--callback get_all_test_model_ids() -> [{Model_Id :: scenev_model_id(), Source :: scenev_source()}].
+-callback retrieve_sources() -> [{Model_Id :: scenev_model_id(), Source :: scenev_source()}].
 -callback transform_raw_scenario(Scenario_Num :: pos_integer(), Raw_Scenario :: term()) -> {single, scenev_scenario()} |
                                                                                            {many,  [scenev_scenario()]}.
 -callback deduce_expected(Scenario_Instance :: scenev_scenario()) -> scenev_expected_status().
@@ -41,7 +41,7 @@
 %% Cb_Module is the callback module provided by the model instance.
 -spec test_all_models(module()) -> [{scenev_model_id(), scenev_result()}].
 test_all_models(Cb_Module) ->
-    {ok, IDs} = exec_callback(Cb_Module, get_all_test_model_ids, []),
+    {ok, IDs} = exec_callback(Cb_Module, retrieve_sources, []),
     NewIDs = lists:append([expand_dir(ID) || ID <- IDs]),
     [begin
          {ok, Raw_Scenarios} = generate_raw(Source),
